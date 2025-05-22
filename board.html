@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chessboard with Status and History</title>
+  <script src="chess.js"></script>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+      font-family: sans-serif;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, 60px);
+      grid-template-rows: repeat(8, 60px);
+      border: 3px solid #333;
+    }
+    .square {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .white { background-color: #f0d9b5; }
+    .black { background-color: #b58863; }
+    .selected { outline: 3px solid rgb(152, 184, 8); }
+    .info {
+      margin-top: 20px;
+      text-align: center;
+    }
+    .history {
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: 300px;
+      background: #f1dddd;
+    }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+    .promotion-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border: 2px solid #333;
+      border-radius: 5px;
+      z-index: 100;
+      display: none;
+    }
+    .promotion-options {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .promotion-option {
+      font-size: 36px;
+      cursor: pointer;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+    .promotion-option:hover {
+      background-color: #f0f0f0;
+    }
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 99;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="chessboard" class="board"></div>
+  <div class="info">
+    <p id="status">Status: Ongoing</p>
+    <p>Current Player: <span id="player">White</span></p>
+  </div>
+  <div class="controls">
+    <button id="undoBtn">Undo</button>
+    <button id="redoBtn">Redo</button>
+    <button id="resetBtn">Reset Game</button>
+  </div>
+  <div class="history">
+    <h4>Move History</h4>
+    <ol id="moveHistoryList"></ol>
+  </div>
+  
+  <div class="overlay" id="promotionOverlay"></div>
+  <div class="promotion-modal" id="promotionModal">
+    <h3>Promote Pawn to:</h3>
+    <div class="promotion-options" id="promotionOptions"></div>
+  </div>
+
+  <script>
+    const game = new ChessGame();
+    const boardEl = document.getElementById('chessboard');
+    const statusEl = document.getElementById('status');
+    const playerEl = document.getElementById('player');
+    const moveHistoryList = document.getElementById('moveHistoryList');
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const promotionModal = document.getElementById('promotionModal');
+    const promotionOverlay = document.getElementById('promotionOverlay');
+    const promotionOptions = document.getElementById('promotionOptions');
+    let selected = null;
+
+    const unicodePieces = {
+      'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
+      'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟︎'
+    };
+
+    const getColor = (row, col) => (row + col) % 2 === 0 ? 'white' : 'black';
+
+    const parseBoardState = (state) => {
+      const board = [];
+      for (let i = 0; i < 8; i++) {
+        board.push(state.slice(i * 8, i * 8 + 8).split(''));
+      }
+      return board;
+    };
+
+    const showPromotionModal = () => {
+      const isWhite = game.getCurrentPlayer() === 'w';
+      const pieces = isWhite ? ['Q', 'R', 'B', 'N'] : ['q', 'r', 'b', 'n'];
+      
+      promotionOptions.innerHTML = '';
+      pieces.forEach(piece => {
+        const option = document.createElement('div');
+        option.className = 'promotion-option';
+        option.textContent = unicodePieces[piece];
+        option.onclick = () => {
+          game.promotePawn(piece);
+          promotionModal.style.display = 'none';
+          promotionOverlay.style.display = 'none';
+          renderBoard();
+        };
+        promotionOptions.appendChild(option);
+      });
+      
+      promotionModal.style.display = 'block';
+      promotionOverlay.style.display = 'block';
+    };
+
+    const renderBoard = () => {
+      if (game.pendingPromotion) {
+        showPromotionModal();
+      }
+      
+      const state = game.getBoardState();
+      const board = parseBoardState(state);
+      boardEl.innerHTML = '';
+
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const square = document.createElement('div');
+          square.className = `square ${getColor(row, col)}`;
+          const piece = board[row][col];
+          if (piece !== ' ') {
+            square.textContent = unicodePieces[piece];
+          }
+          if (selected && selected.row === row && selected.col === col) {
+            square.classList.add('selected');
+          }
+          square.onclick = () => handleSquareClick(row, col);
+          boardEl.appendChild(square);
+        }
+      }
+
+      const status = game.getGameStatus();
+      statusEl.textContent = "Status: " + status;
+      playerEl.textContent = game.getCurrentPlayer() === 'w' ? "White" : "Black";
+      
+      if (game.isGameOver()) {
+        undoBtn.disabled = true;
+        redoBtn.disabled = true;
+      } else {
+        undoBtn.disabled = false;
+        redoBtn.disabled = false;
+      }
+    };
+
+    const handleSquareClick = (row, col) => {
+      if (game.isGameOver() || game.pendingPromotion) return;
+      
+      const board = parseBoardState(game.getBoardState());
+      const piece = board[row][col];
+
+      if (selected) {
+        if (game.makeMove(selected.row, selected.col, row, col)) {
+          const moveNotation = `${String.fromCharCode(97 + selected.col)}${8 - selected.row} → ${String.fromCharCode(97 + col)}${8 - row}`;
+          const li = document.createElement('li');
+          li.textContent = moveNotation;
+          moveHistoryList.appendChild(li);
+          
+          if (!game.pendingPromotion) {
+            selected = null;
+          }
+        } else if (piece !== ' ') {
+          selected = { row, col };
+        } else {
+          selected = null;
+        }
+      } else if (piece !== ' ') {
+        selected = { row, col };
+      }
+
+      renderBoard();
+    };
+
+    undoBtn.addEventListener('click', () => {
+      if (game.undoMove()) {
+        moveHistoryList.removeChild(moveHistoryList.lastChild);
+        renderBoard();
+      }
+    });
+
+    redoBtn.addEventListener('click', () => {
+      if (game.redoMove()) {
+        const lastMove = game.undoStack[game.undoStack.length - 1];
+        const moveNotation = `${String.fromCharCode(97 + lastMove.fromC)}${8 - lastMove.fromR} → ${String.fromCharCode(97 + lastMove.toC)}${8 - lastMove.toR}`;
+        const li = document.createElement('li');
+        li.textContent = moveNotation;
+        moveHistoryList.appendChild(li);
+        renderBoard();
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      game.initialize();
+      selected = null;
+      moveHistoryList.innerHTML = '';
+      renderBoard();
+    });
+
+    renderBoard();
+  </script>
+</body>
+</html>
