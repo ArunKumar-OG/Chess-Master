@@ -11,13 +11,39 @@
       align-items: center;
       padding: 40px;
       font-family: sans-serif;
+      background-image: url('assets/newcycles.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
     }
+
     .board {
       display: grid;
       grid-template-columns: repeat(8, 60px);
       grid-template-rows: repeat(8, 60px);
-      border: 3px solid #333;
+      border: 5px solid #222;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      background-color: #1c1c1c;
     }
+
+
+      
+    .main-container{
+      margin-left: -390px;
+      margin-top: 60px;   
+      display: flex;
+      gap: 60px;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+
     .square {
       position: relative;
       display: flex;
@@ -26,32 +52,70 @@
       font-size: 36px;
       cursor: pointer;
       user-select: none;
+      transition: background-color 0.3s, transform 0.3s;
     }
-    .white { background-color: #f0d9b5; }
-    .black { background-color: #b58863; }
-    .selected { outline: 3px solid rgb(152, 184, 8); }
+
+    .white {
+      background-color: #dbc6a5;
+    }
+
+    .black {
+      background-color: #654166;
+    }
+
+    .selected {
+      outline: 3px solid #98b808;
+      position: relative;
+      z-index: 1;
+    }
+
+
+        @font-face {
+      font-family: 'FunnelDisplay';
+      src: url('assets/fonts/FunnelDisplay-Bold.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
     .info {
-      margin-top: 20px;
       text-align: center;
+      font-size: 20px;
+      font-family: 'FunnelDisplay',sans-serif;
+      color: #feffff;
     }
+
     .history {
       margin-top: 20px;
       max-height: 200px;
       overflow-y: auto;
-      border: 1px solid #ccc;
+      border: 1px solid #f0e2e2;
       padding: 10px;
       width: 300px;
-      background: #f1dddd;
+      background: #242222;
+      color: #fff9f9;
+      
     }
+
     .controls {
-      margin-top: 20px;
+      margin: 20px 0;
       display: flex;
       gap: 10px;
     }
+
     button {
       padding: 8px 16px;
       cursor: pointer;
+      background: #000000;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
     }
+
+    button:hover {
+      background: #4d7eb6;
+    }
+
     .promotion-modal {
       position: fixed;
       top: 50%;
@@ -64,21 +128,26 @@
       z-index: 100;
       display: none;
     }
+
     .promotion-options {
       display: flex;
       gap: 10px;
       margin-top: 10px;
     }
+
     .promotion-option {
       font-size: 36px;
       cursor: pointer;
       padding: 5px;
       border: 1px solid #ccc;
       border-radius: 3px;
+      background: white;
     }
+
     .promotion-option:hover {
       background-color: #f0f0f0;
     }
+
     .overlay {
       position: fixed;
       top: 0;
@@ -89,29 +158,46 @@
       z-index: 99;
       display: none;
     }
+
+    .square img {
+      max-width: 100%;
+      max-height: 100%;
+      user-select: none;
+      pointer-events: none;
+    }
+
+
   </style>
 </head>
 <body>
-  <div id="chessboard" class="board"></div>
-  <div class="info">
-    <p id="status">Status: Ongoing</p>
-    <p>Current Player: <span id="player">White</span></p>
-  </div>
-  <div class="controls">
-    <button id="undoBtn">Undo</button>
-    <button id="redoBtn">Redo</button>
-    <button id="resetBtn">Reset Game</button>
-  </div>
-  <div class="history">
-    <h4>Move History</h4>
-    <ol id="moveHistoryList"></ol>
-  </div>
+  <div class="main-container">
+  <div class="sidebar">
+    <div class="controls">
+      <button id="undoBtn">Undo</button>
+      <button id="redoBtn">Redo</button>
+      <button id="resetBtn">Reset Game</button>
+    </div>
   
-  <div class="overlay" id="promotionOverlay"></div>
-  <div class="promotion-modal" id="promotionModal">
-    <h3>Promote Pawn to:</h3>
-    <div class="promotion-options" id="promotionOptions"></div>
+    <div class="history">
+      <h4>Move History</h4>
+      <ol id="moveHistoryList"></ol>
+    </div>
   </div>
+
+ <div>
+  <div class="info">
+    <span id="status">Status: Ongoing</span>
+    <span style="margin-left: 40px;">Current Player: <span id="player">White</span></p>
+  </div>
+  <div id="chessboard" class="board"></div>
+</div>
+
+<div class="overlay" id="promotionOverlay"></div>
+<div class="promotion-modal" id="promotionModal">
+  <h3>Promote Pawn to:</h3>
+  <div class="promotion-options" id="promotionOptions"></div>
+</div>
+
 
   <script>
     const game = new ChessGame();
@@ -127,11 +213,6 @@
     const promotionOptions = document.getElementById('promotionOptions');
     let selected = null;
 
-    const unicodePieces = {
-      'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
-      'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟︎'
-    };
-
     const getColor = (row, col) => (row + col) % 2 === 0 ? 'white' : 'black';
 
     const parseBoardState = (state) => {
@@ -145,12 +226,20 @@
     const showPromotionModal = () => {
       const isWhite = game.getCurrentPlayer() === 'w';
       const pieces = isWhite ? ['Q', 'R', 'B', 'N'] : ['q', 'r', 'b', 'n'];
-      
+
       promotionOptions.innerHTML = '';
       pieces.forEach(piece => {
         const option = document.createElement('div');
         option.className = 'promotion-option';
-        option.textContent = unicodePieces[piece];
+
+        const img = document.createElement('img');
+        const color = piece === piece.toUpperCase() ? 'w' : 'b';
+        const type = piece.toUpperCase();
+        img.src = `assets/pieces/${color}${type}.png`;
+        img.alt = piece;
+        img.className = 'w-12 h-12 object-contain';
+
+        option.appendChild(img);
         option.onclick = () => {
           game.promotePawn(piece);
           promotionModal.style.display = 'none';
@@ -159,7 +248,7 @@
         };
         promotionOptions.appendChild(option);
       });
-      
+
       promotionModal.style.display = 'block';
       promotionOverlay.style.display = 'block';
     };
@@ -167,8 +256,9 @@
     const renderBoard = () => {
       if (game.pendingPromotion) {
         showPromotionModal();
+        return;
       }
-      
+
       const state = game.getBoardState();
       const board = parseBoardState(state);
       boardEl.innerHTML = '';
@@ -178,12 +268,21 @@
           const square = document.createElement('div');
           square.className = `square ${getColor(row, col)}`;
           const piece = board[row][col];
+
           if (piece !== ' ') {
-            square.textContent = unicodePieces[piece];
+            const img = document.createElement('img');
+            const color = piece === piece.toUpperCase() ? 'w' : 'b';
+            const type = piece.toUpperCase();
+            img.src = `assets/pieces/${color}${type}.png`;
+            img.alt = piece;
+            img.className = 'w-full h-full object-contain';
+            square.appendChild(img);
           }
+
           if (selected && selected.row === row && selected.col === col) {
             square.classList.add('selected');
           }
+
           square.onclick = () => handleSquareClick(row, col);
           boardEl.appendChild(square);
         }
@@ -192,19 +291,14 @@
       const status = game.getGameStatus();
       statusEl.textContent = "Status: " + status;
       playerEl.textContent = game.getCurrentPlayer() === 'w' ? "White" : "Black";
-      
-      if (game.isGameOver()) {
-        undoBtn.disabled = true;
-        redoBtn.disabled = true;
-      } else {
-        undoBtn.disabled = false;
-        redoBtn.disabled = false;
-      }
+
+      undoBtn.disabled = game.isGameOver();
+      redoBtn.disabled = game.isGameOver();
     };
 
     const handleSquareClick = (row, col) => {
       if (game.isGameOver() || game.pendingPromotion) return;
-      
+
       const board = parseBoardState(game.getBoardState());
       const piece = board[row][col];
 
@@ -214,7 +308,7 @@
           const li = document.createElement('li');
           li.textContent = moveNotation;
           moveHistoryList.appendChild(li);
-          
+
           if (!game.pendingPromotion) {
             selected = null;
           }
